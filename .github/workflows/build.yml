@@ -22,12 +22,14 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Make gradlew executable
+        run: |
+          cd LayoutOrchestrator
+          chmod +x gradlew
+
       - name: Build Project
         run: |
           cd LayoutOrchestrator
-          # Make gradlew executable
-          chmod +x gradlew
-          # Build the APK
           ./gradlew assembleRelease --stacktrace
 
       - name: Upload APK
