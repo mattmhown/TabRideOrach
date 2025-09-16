@@ -1,0 +1,188 @@
+name: Merge, Build, and Deploy
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out your existing repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Create new files and update existing ones
+      # This performs the merge without deleting anything.
+      - name: Merge New Project Files
+        run: |
+          echo "🚀 Starting file merge process..."
+
+          # Create new directories for shell, utils, etc.
+          mkdir -p app/src/main/java/com/internal/layout/orchestrator/shell
+          mkdir -p app/src/main/java/com/internal/layout/orchestrator/utils
+
+          # --- Create NEW Kotlin files ---
+          echo "Creating ShizukuShell.kt..."
+          cat << 'EOF' > app/src/main/java/com/internal/layout/orchestrator/shell/ShizukuShell.kt
+          package com.internal.layout.orchestrator.shell
+          import android.util.Log
+          import rikka.shizuku.Shizuku
+          import rikka.shizuku.ShizukuRemoteProcess
+          object ShizukuShell {
+              private const val TAG = "ShizukuShell"
+              val isAvailable: Boolean get() = try { Shizuku.isRemoteProcess() || (Shizuku.checkSelfPermission() == 0) } catch (e: Exception) { false }
+              fun exec(command: String): String {
+                  if (!isAvailable) { Log.e(TAG, "Shizuku not available."); return "Shizuku not available." }
+                  return try {
+                      val process: ShizukuRemoteProcess = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
+                      val output = process.inputStream.bufferedReader().readText()
+                      process.waitFor()
+                      output
+                  } catch (e: Exception) { Log.e(TAG, "Shizuku execution failed for command: $command", e); e.message ?: "Execution failed" }
+              }
+          }
+          EOF
+
+          echo "Creating ShellController.kt..."
+          cat << 'EOF' > app/src/main/java/com/internal/layout/orchestrator/shell/ShellController.kt
+          package com.internal.layout.orchestrator.shell
+          import android.graphics.Rect
+          object ShellController {
+              fun resizeTask(taskId: Int, bounds: Rect) {
+                  val command = "wm resize-task $taskId ${bounds.left} ${bounds.top} ${bounds.right} ${bounds.bottom}"
+                  ShizukuShell.exec(command)
+              }
+              fun forceStopPackage(packageName: String) {
+                  ShizukuShell.exec("am force-stop $packageName")
+              }
+          }
+          EOF
+
+          echo "Creating LenovoUtils.kt..."
+          cat << 'EOF' > app/src/main/java/com/internal/layout/orchestrator/utils/LenovoUtils.kt
+          package com.internal.layout.orchestrator.utils
+          import android.os.Build
+          object LenovoUtils {
+              fun isLenovoTablet(): Boolean = Build.MANUFACTURER.equals("lenovo", ignoreCase = true)
+          }
+          EOF
+
+          # --- Overwrite EXISTING files that need updates ---
+          echo "Updating app/build.gradle.kts with Shizuku dependency..."
+          cat << 'EOF' > app/build.gradle.kts
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.internal.layout.orchestrator"
+              compileSdk = 34
+              defaultConfig {
+                  applicationId = "com.internal.layout.orchestrator"
+                  minSdk = 28
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_1_8
+                  targetCompatibility = JavaVersion.VERSION_1_8
+              }
+              kotlinOptions { jvmTarget = "1.8" }
+              buildFeatures { viewBinding = true }
+          }
+          dependencies {
+              implementation("androidx.core:core-ktx:1.12.0")
+              implementation("androidx.appcompat:appcompat:1.6.1")
+              implementation("com.google.android.material:material:1.11.0")
+              implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
+              // Added Dependencies
+              implementation("com.google.code.gson:gson:2.10.1")
+              implementation("dev.rikka.shizuku:api:13.1.5")
+              implementation("dev.rikka.shizuku:provider:13.1.5")
+          }
+          EOF
+
+          echo "Updating AndroidManifest.xml for Shizuku..."
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.REORDER_TASKS" />
+              <application
+                  android:name=".OrchestratorApplication"
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="@string/app_name"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.3PaneLayoutOrchestrator"
+                  tools:targetApi="31">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <activity android:name=".ConfigActivity" android:exported="false" />
+                  <service android:name=".services.LayoutWatchdogService" />
+                  <service android:name=".services.WindowBoundsService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="false">
+                      <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+                      <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" />
+                  </service>
+                  <service android:name=".tiles.LayoutResetTile" android:exported="true" android:icon="@drawable/ic_layout_reset" android:label="@string/tile_label" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+                      <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+                  </service>
+                  <receiver android:name=".receivers.BootReceiver" android:exported="true">
+                      <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
+                  </receiver>
+                  <provider
+                      android:name="rikka.shizuku.ShizukuProvider"
+                      android:authorities="${applicationId}.shizuku"
+                      android:enabled="true"
+                      android:exported="true"
+                      android:multiprocess="false"
+                      android:permission="android.permission.MANAGE_DOCUMENTS" />
+              </application>
+          </manifest>
+          EOF
+
+          echo "✅ File merge complete."
+
+
+      # Step 3: Setup JDK and Gradle
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Step 4: Build the merged project
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      # Step 5: Zip the final source code for download
+      - name: Archive Final Source Code
+        run: zip -r TabRideOrach-Final-Source.zip .
+        
+      # Step 6: Upload the APK and the source code zip as artifacts
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            TabRideOrach-Final-Source.zip
+          retention-days: 7
