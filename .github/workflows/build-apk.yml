@@ -17,7 +17,7 @@ jobs:
     - name: Unzip folder
       run: |
         # Replace 'folder.zip' with your zip file name
-        unzip folder.zip -d ./destination-folder
+        unzip LayoutOrchestrator-final.zip -d ./destination-folder
       working-directory: ${{ github.workspace }}
 
     # Commit and push changes
