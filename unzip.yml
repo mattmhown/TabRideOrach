@@ -1,0 +1,27 @@
+name: Unzip Folder
+on:
+  push:
+    branches: [ main ]
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+    # Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v4
+    # Unzip the specified folder to root
+    - name: Unzip folder
+      run: |
+        # Replace 'folder.zip' with your zip file name
+        unzip LayoutOrchestrator-final.zip -d .
+      working-directory: ${{ github.workspace }}
+    # Commit and push changes
+    - name: Commit unzipped files
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .
+        git commit -m "Unzip folder contents to root"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
