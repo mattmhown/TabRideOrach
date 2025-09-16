@@ -1,5 +1,6 @@
 package com.internal.layout.orchestrator.services
 
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
@@ -7,7 +8,6 @@ import android.os.Build
 import android.view.*
 import android.widget.ImageView
 import android.widget.Toast
-import com.internal.layout.orchestrator.R
 import com.internal.layout.orchestrator.core.LayoutOrchestrator
 import com.internal.layout.orchestrator.data.TemplatesRepository
 import com.internal.layout.orchestrator.shell.ShizukuShell
@@ -16,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-class ResetBubbleService : android.app.Service() {
+class ResetBubbleService : Service() {
     private lateinit var wm: WindowManager
     private var bubbleView: View? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -66,7 +66,6 @@ class ResetBubbleService : android.app.Service() {
         WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
 
     private fun getOptimalYPosition(): Int {
-        // Position slightly lower for better tablet accessibility
         return if (isLenovoDevice()) 300 else 200
     }
 
@@ -76,7 +75,8 @@ class ResetBubbleService : android.app.Service() {
 
     private fun createBubbleImageView(params: WindowManager.LayoutParams): ImageView {
         return ImageView(this).apply {
-            setImageResource(R.drawable.ic_layout_reset)
+            // Use system refresh icon instead of custom drawable
+            setImageResource(android.R.drawable.ic_popup_sync)
             setPadding(24, 24, 24, 24)
            
             // Lenovo-specific styling for better visibility
@@ -129,8 +129,8 @@ class ResetBubbleService : android.app.Service() {
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = Math.abs(e.rawX - lastX)
-                    val dy = Math.abs(e.rawY - lastY)
+                    val dx = kotlin.math.abs(e.rawX - lastX)
+                    val dy = kotlin.math.abs(e.rawY - lastY)
                    
                     if (dx > dragThreshold || dy > dragThreshold) {
                         isDragging = true
