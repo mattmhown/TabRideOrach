@@ -12,27 +12,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: set up JDK 17
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Unzip the project
+      run: unzip LayoutOrchestrator-final.zip #<-- IMPORTANT: Change "YourProject.zip" to your actual file name
+
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
         cache: gradle
 
-    - name: Unzip the project
-      run: unzip LayoutOrchestrator-final.zip #<-- IMPORTANT: Change "YourProject.zip" to the name of your zip file
-
     - name: Grant execute permission for gradlew
-      working-directory: ./LayoutOrchestrator-final
+      working-directory: ./LayoutOrchestrator-final #<-- Make sure this matches the folder in your zip
       run: chmod +x gradlew
 
     - name: Build with Gradle
-      working-directory: ./LayoutOrchestrator-final
+      working-directory: ./LayoutOrchestrator-final #<-- Make sure this matches the folder in your zip
       run: ./gradlew assembleRelease
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: app-release.apk
-        path: app/build/outputs/apk/release/app-release.apk
+        path: LayoutOrchestrator-final/app/build/outputs/apk/release/app-release.apk
