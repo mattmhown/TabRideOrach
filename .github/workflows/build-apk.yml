@@ -18,7 +18,7 @@ jobs:
           mkdir -p workspace/LayoutOrchestrator
           unzip -o LayoutOrchestrator-final.zip -d workspace/LayoutOrchestrator
           echo "✅ Project extracted to workspace/LayoutOrchestrator"
-          ls -R workspace/LayoutOrchestrator | head -50
+          ls workspace/LayoutOrchestrator
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
