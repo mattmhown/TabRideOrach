@@ -9,21 +9,31 @@ jobs:
     # Checkout the repository
     - name: Checkout code
       uses: actions/checkout@v4
-    # Unzip the specified folder to LayoutOrchestrator-final
-    - name: Unzip folder
+    # Check if app.zip exists and unzip to LayoutOrchestrator-final
+    - name: Unzip app.zip
       run: |
+        # Verify if app.zip exists
+        if [ ! -f app.zip ]; then
+          echo "Error: app.zip not found in repository root"
+          exit 1
+        fi
         # Create destination directory if it doesn't exist
         mkdir -p LayoutOrchestrator-final
-        # Replace 'folder.zip' with your zip file name
+        # Unzip app.zip to LayoutOrchestrator-final
         unzip app.zip -d LayoutOrchestrator-final
       working-directory: ${{ github.workspace }}
-    # Commit and push changes
+    # Commit and push changes only if there are changes
     - name: Commit unzipped files
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .
-        git commit -m "Unzip folder contents to LayoutOrchestrator-final"
-        git push
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Unzip app.zip contents to LayoutOrchestrator-final"
+          git push
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
