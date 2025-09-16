@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <EditText
+            android:id="@+id/etTemplateName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Template name"
+            android:singleLine="true"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Top App"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tvTopApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Top: "
+            android:layout_marginTop="4dp"/>
+
+        <Button
+            android:id="@+id/btnSelectTopApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select Top App"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bottom Left App"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tvBottomLeftApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bottom Left: "
+            android:layout_marginTop="4dp"/>
+
+        <Button
+            android:id="@+id/btnSelectBottomLeftApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select Bottom Left App"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bottom Right App"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tvBottomRightApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bottom Right: "
+            android:layout_marginTop="4dp"/>
+
+        <Button
+            android:id="@+id/btnSelectBottomRightApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select Bottom Right App"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Top Panel Height"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tvTopHeight"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Top Height: 33%"
+            android:layout_marginTop="4dp"/>
+
+        <SeekBar
+            android:id="@+id/seekBarTopHeight"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="80"
+            android:progress="33"
+            android:layout_marginBottom="16dp"/>
+
+        <Button
+            android:id="@+id/btnActiveTemplate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select Active Template"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btnSaveConfig"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Save Template"
+                android:layout_marginEnd="4dp"/>
+            <Button
+                android:id="@+id/btnDeleteTemplate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Delete"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
