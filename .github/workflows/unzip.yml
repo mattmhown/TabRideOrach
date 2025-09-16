@@ -9,11 +9,13 @@ jobs:
     # Checkout the repository
     - name: Checkout code
       uses: actions/checkout@v4
-    # Unzip the specified folder to root
+    # Unzip the specified folder to LayoutOrchestrator-final
     - name: Unzip folder
       run: |
+        # Create destination directory if it doesn't exist
+        mkdir -p LayoutOrchestrator-final
         # Replace 'folder.zip' with your zip file name
-        unzip LayoutOrchestrator-final/app.zip -d .
+        unzip app.zip -d LayoutOrchestrator-final
       working-directory: ${{ github.workspace }}
     # Commit and push changes
     - name: Commit unzipped files
@@ -21,7 +23,7 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .
-        git commit -m "Unzip folder contents to root"
+        git commit -m "Unzip folder contents to LayoutOrchestrator-final"
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
