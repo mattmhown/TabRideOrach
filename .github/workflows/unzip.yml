@@ -24,9 +24,11 @@ jobs:
       run: unzip LayoutOrchestrator-final.zip #<-- IMPORTANT: Change "YourProject.zip" to the name of your zip file
 
     - name: Grant execute permission for gradlew
+      working-directory: ./LayoutOrchestrator-final
       run: chmod +x gradlew
 
     - name: Build with Gradle
+      working-directory: ./LayoutOrchestrator-final
       run: ./gradlew assembleRelease
 
     - name: Upload APK
