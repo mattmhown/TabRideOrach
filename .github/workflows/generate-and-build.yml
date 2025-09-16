@@ -44,7 +44,7 @@ jobs:
           echo "networkTimeout=10000" >> gradle/wrapper/gradle-wrapper.properties
           echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
           echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
-          chmod +x gradlew
+          touch gradlew && chmod +x gradlew
 
       - name: Assemble Release APK
         run: |
