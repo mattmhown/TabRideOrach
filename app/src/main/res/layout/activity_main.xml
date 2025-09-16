@@ -57,8 +57,107 @@
                 android:text="Unknown"/>
         </LinearLayout>
 
-        <!-- Additional UI elements as per the script -->
-        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Freeform:"/>
+            <TextView
+                android:id="@+id/tvFreeformStatus"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Unknown"/>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Services"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+           
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Watchdog Service"/>
+            <Switch
+                android:id="@+id/switchWatchdog"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Floating Reset Bubble"/>
+            <Switch
+                android:id="@+id/switchBubble"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Required Permissions"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnGrantShizuku"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Grant Shizuku Access"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnEnableFreeform"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Enable Freeform Flags (Shizuku)"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+            <Button
+                android:id="@+id/btnOverlayPermission"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Overlay"
+                android:layout_marginEnd="4dp"/>
+            <Button
+                android:id="@+id/btnUsageAccess"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Usage Access"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -66,7 +165,7 @@
             android:textStyle="bold"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="8dp"/>
-            
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
