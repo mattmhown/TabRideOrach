@@ -12,10 +12,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify Unzipped Project
+      - name: Verify Unzipped Project Structure
         run: |
-          echo "Checking contents of unzipped project"
-          ls destination-folder/LayoutOrchestrator-final/
+          echo "Listing contents of destination-folder/"
+          ls -R destination-folder/
+          echo "Checking for gradlew in destination-folder/LayoutOrchestrator-final/"
+          find destination-folder/LayoutOrchestrator-final -name gradlew
           
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -28,11 +30,24 @@ jobs:
 
       - name: Build Release APK
         run: |
+          # Navigate to the project directory
           cd destination-folder/LayoutOrchestrator-final
-          chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace
+          
+          # Check if gradlew exists
+          if [ -f gradlew ]; then
+            echo "Using Gradle wrapper"
+            chmod +x gradlew
+            ./gradlew assembleRelease --stacktrace
+          else
+            echo "gradlew not found, using system Gradle"
+            gradle assembleRelease --stacktrace
+          fi
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
       - name: Upload APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: LayoutOrchestrator-APK
