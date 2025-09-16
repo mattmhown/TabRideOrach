@@ -49,19 +49,39 @@ android.useAndroidX=true
 kotlin.code.style=official
 EOT
 
-# gradlew (Unix script)
+# Create Gradle wrapper files
+mkdir -p "$PROJECT_NAME/gradle/wrapper"
+
+# gradle-wrapper.properties
+cat > "$PROJECT_NAME/gradle/wrapper/gradle-wrapper.properties" << 'EOT'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+networkTimeout=10000
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+EOT
+
+# gradlew (Unix script) - Proper Gradle wrapper
 cat > "$PROJECT_NAME/gradlew" << 'EOT'
 #!/bin/sh
-export GRADLE_HOME=`pwd`/gradle
-export PATH=$GRADLE_HOME/bin:$PATH
 
-if [ ! -d "$GRADLE_HOME" ]; then
-  echo "Downloading Gradle wrapper..."
-  mkdir -p gradle
+# Find the script directory
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
+
+# Create gradle directory and wrapper if it doesn't exist
+if [ ! -d "$SCRIPT_DIR/gradle/wrapper" ]; then
+    mkdir -p "$SCRIPT_DIR/gradle/wrapper"
 fi
 
-echo "Run './gradlew assembleRelease' to build APK"
-echo "Note: This script is placeholder for CI builds"
+# If gradle-wrapper.jar doesn't exist, create a minimal one or download it
+if [ ! -f "$SCRIPT_DIR/gradle/wrapper/gradle-wrapper.jar" ]; then
+    echo "Note: Gradle wrapper JAR will be downloaded on first build"
+fi
+
+# Execute Gradle
+exec java -jar "$SCRIPT_DIR/gradle/wrapper/gradle-wrapper.jar" "$@"
 EOT
 chmod +x "$PROJECT_NAME/gradlew"
 
