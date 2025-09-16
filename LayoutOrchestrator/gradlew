@@ -1,3 +1,0 @@
-#!/bin/sh
-cd "$(dirname "$0")"
-exec java -jar gradle/wrapper/gradle-wrapper.jar "$@"
