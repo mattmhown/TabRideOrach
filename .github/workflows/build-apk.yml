@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Release APK
         run: |
-          cd workspace/LayoutOrchestrator
+          cd workspace/TabRideOrach/LayoutOrchestrator
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace
 
@@ -40,4 +40,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: LayoutOrchestrator-APK
-          path: workspace/LayoutOrchestrator/app/build/outputs/apk/release/*.apk
+          path: workspace/TabRideOrach/LayoutOrchestrator/app/build/outputs/apk/release/*.apk
