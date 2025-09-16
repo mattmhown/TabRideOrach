@@ -1,0 +1,80 @@
+name: Generate Project & Build APK
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Run the script to generate all project files
+      - name: Generate Full Android Project (via your script)
+        run: |
+          cat > create_project.sh << 'EOL'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          PROJECT_NAME="LayoutOrchestrator"
+          echo "🚀 Creating optimized Lenovo Tab Plus 3-Pane Layout Orchestrator project..."
+
+          rm -rf "$PROJECT_NAME" && mkdir -p "$PROJECT_NAME"
+          mkdir -p "$PROJECT_NAME"/{.github/workflows,app/src/main/{java/com/internal/layout/orchestrator/{core,data,layout,shell,services,tiles,ui,utils},res/{drawable,layout,mipmap,values},assets}}
+
+          # Write all files from previous message above...
+          # [THIS IS WHERE YOU PASTE THE ENTIRE SCRIPT GENERATED EARLIER]
+          # Keep everything between "#!/usr/bin/env bash" and the final zip creation line
+          
+          EOL
+
+          # Append the actual full script below here (copy-paste all content from earlier)
+          
+          # THEN START COPYING ALL THE PARTS BELOW INTO THIS SCRIPT (the ENTIRE script above)
+
+          # Now make script executable and run it
+          chmod +x create_project.sh
+          bash ./create_project.sh
+
+      # Push generated project to repo
+      - name: Commit and Push Generated Files
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git add .
+          git commit -m "Auto-generate project structure" || echo "Nothing to commit"
+          git push
+
+      # Now build with proper Gradle wrapper for full Android compatibility
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Generate Gradle Wrapper Properly
+        run: |
+          cd LayoutOrchestrator
+          echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
+          echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+          echo "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
+          echo "networkTimeout=10000" >> gradle/wrapper/gradle-wrapper.properties
+          echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
+          echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+          touch gradlew && chmod +x gradlew
+
+      - name: Make Gradle Wrapper Executable
+        run: |
+          cd LayoutOrchestrator
+          chmod +x ./gradlew
+
+      - name: Assemble Release APK
+        run: |
+          cd LayoutOrchestrator
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "layout-orchestrator-apk"
+          path: LayoutOrchestrator/app/build/outputs/apk/release/*.apk
