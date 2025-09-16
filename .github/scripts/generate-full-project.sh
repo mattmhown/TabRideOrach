@@ -1145,7 +1145,7 @@ class MainActivity : AppCompatActivity() {
                         this, 
                         if (granted) "Shizuku access granted!" else "Permission denied", 
                         Toast.LENGTH_SHORT
-                    ).show
+                    ).show()
                     
                     if (granted) {
                         updateStatusIndicators()
@@ -1580,7 +1580,7 @@ cat > "$PROJECT_NAME/app/src/main/res/layout/activity_config.xml" << 'EOT'
             android:layout_height="wrap_content"
             android:hint="Template name"
             android:singleLine="true"
-            android:layout_marginBottom="16dp"/>
+            android:layout-marginBottom="16dp"/>
 
         <TextView
             android:layout_width="match_parent"
