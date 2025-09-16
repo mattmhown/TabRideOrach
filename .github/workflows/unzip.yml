@@ -25,8 +25,10 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Rename gradlew.txt to gradlew
-      run: mv LayoutOrchestrator-final/gradlew.txt LayoutOrchestrator-final/gradlew    
+    - name: Fix gradlew script
+      run: |
+        mv LayoutOrchestrator-final/gradlew.txt LayoutOrchestrator-final/gradlew
+        sed -i '1s/sh/bash/' LayoutOrchestrator-final/gradlew   
 
     - name: Grant execute permission for gradlew
       working-directory: ./LayoutOrchestrator-final #<-- Make sure this matches the folder in your zip
