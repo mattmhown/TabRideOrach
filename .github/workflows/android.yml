@@ -62,34 +62,55 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/wrapper-validation-action@v2
 
-      - name: Setup Keystore (if release)
-        if: ${{ github.event.inputs.release_type == 'release' && secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      - name: Check for Release Secrets
+        id: check_secrets
+        run: |
+          if [ "${{ github.event.inputs.release_type }}" = "release" ]; then
+            if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+              echo "has_keystore=true" >> $GITHUB_OUTPUT
+              echo "✅ Keystore secrets available for release signing"
+            else
+              echo "has_keystore=false" >> $GITHUB_OUTPUT
+              echo "⚠️ No keystore secrets - will build unsigned release"
+            fi
+          else
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Debug build - no keystore needed"
+          fi
+
+      - name: Setup Keystore for Release
+        if: steps.check_secrets.outputs.has_keystore == 'true'
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
           echo "ANDROID_KEYSTORE_PATH=$PWD/keystore.jks" >> $GITHUB_ENV
           echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
           echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
           echo "ANDROID_KEY_ALIAS_PASSWORD=${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}" >> $GITHUB_ENV
+          echo "🔐 Keystore configured for release signing"
 
       - name: Build Debug APK
-        if: ${{ github.event.inputs.release_type != 'release' }}
+        if: github.event.inputs.release_type != 'release'
         run: |
+          echo "🏗️ Building Debug APK..."
           ./gradlew assembleDebug --stacktrace --info
           
-      - name: Build Release APK
-        if: ${{ github.event.inputs.release_type == 'release' }}
+      - name: Build Release APK (Signed)
+        if: github.event.inputs.release_type == 'release' && steps.check_secrets.outputs.has_keystore == 'true'
         run: |
+          echo "🏗️ Building Signed Release APK..."
           ./gradlew assembleRelease --stacktrace --info
 
-      - name: Sign APK (fallback for unsigned release)
-        if: ${{ github.event.inputs.release_type == 'release' && secrets.ANDROID_KEYSTORE_BASE64 == '' }}
+      - name: Build Release APK (Unsigned)
+        if: github.event.inputs.release_type == 'release' && steps.check_secrets.outputs.has_keystore == 'false'
         run: |
+          echo "🏗️ Building Unsigned Release APK..."
           echo "⚠️ No keystore provided - building unsigned release APK"
           echo "To sign releases, add these secrets to your repository:"
           echo "- ANDROID_KEYSTORE_BASE64 (base64 encoded .jks file)"
           echo "- ANDROID_KEYSTORE_PASSWORD"
           echo "- ANDROID_KEY_ALIAS" 
           echo "- ANDROID_KEY_ALIAS_PASSWORD"
+          ./gradlew assembleRelease --stacktrace --info
 
       - name: Prepare APK artifacts
         run: |
@@ -99,4 +120,88 @@ jobs:
           # Rename files for clarity
           cd build-outputs
           for file in *.apk; do
-            if [[ "$file" == *
+            if [[ "$file" == *"debug"* ]]; then
+              mv "$file" "LayoutOrchestrator-debug-$(date +%Y%m%d-%H%M).apk"
+            elif [[ "$file" == *"release"* ]]; then
+              if [ "${{ steps.check_secrets.outputs.has_keystore }}" = "true" ]; then
+                mv "$file" "LayoutOrchestrator-release-signed-$(date +%Y%m%d-%H%M).apk"
+              else
+                mv "$file" "LayoutOrchestrator-release-unsigned-$(date +%Y%m%d-%H%M).apk"
+              fi
+            fi
+          done
+          
+          echo "📱 Generated APK files:"
+          ls -la *.apk
+
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LayoutOrchestrator-APKs-${{ github.sha }}
+          path: build-outputs/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload Build Reports (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports-${{ github.sha }}
+          path: |
+            app/build/reports/
+            build/reports/
+          retention-days: 7
+
+      - name: Generate Build Summary
+        if: always()
+        run: |
+          echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Type:** ${{ github.event.inputs.release_type || 'debug' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Keystore Available:** ${{ steps.check_secrets.outputs.has_keystore }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d "build-outputs" ]; then
+            echo "### 📱 Generated APKs:" >> $GITHUB_STEP_SUMMARY
+            ls -la build-outputs/ | grep "\.apk" | awk '{print "- " $9 " (" $5 " bytes)"}' >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download Instructions:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to the **Actions** tab in your repository" >> $GITHUB_STEP_SUMMARY
+          echo "2. Click on this workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "3. Scroll down to **Artifacts** section" >> $GITHUB_STEP_SUMMARY
+          echo "4. Download the APK ZIP file" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.check_secrets.outputs.has_keystore }}" = "false" ] && [ "${{ github.event.inputs.release_type }}" = "release" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ⚠️ Release Signing Notice:" >> $GITHUB_STEP_SUMMARY
+            echo "This is an **unsigned** release APK. To generate signed releases:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Create a keystore: \`keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release\`" >> $GITHUB_STEP_SUMMARY
+            echo "2. Encode to base64: \`base64 -i release.jks\`" >> $GITHUB_STEP_SUMMARY
+            echo "3. Add repository secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_ALIAS_PASSWORD" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Optional: Create a release if it's a tagged push
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: LayoutOrchestrator-APKs-${{ github.sha }}
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./artifacts/*.apk
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
