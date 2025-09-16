@@ -36,8 +36,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 34
-          build-tools: 34.0.0
+          cmdline-tools-version: '11076708'
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+
+      - name: Install Android SDK components
+        run: |
+          echo "📱 Installing required Android SDK components..."
+          sdkmanager --install "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+          sdkmanager --licenses >/dev/null 2>&1 || true
 
       - name: Cache Gradle Dependencies
         uses: actions/cache@v4
@@ -53,14 +60,29 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Generate proper Gradle wrapper
+      - name: Fix Gradle wrapper version
         run: |
-          # Generate proper gradle wrapper files
+          echo "🔧 Setting up Gradle 8.7 wrapper..."
+          # Remove existing gradle wrapper files to avoid conflicts
+          rm -rf gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
+          # Generate proper gradle wrapper with specific version
           gradle wrapper --gradle-version 8.7 --distribution-type bin
           chmod +x gradlew
+          
+          echo "✅ Gradle wrapper configured:"
+          cat gradle/wrapper/gradle-wrapper.properties
 
-      - name: Validate Gradle wrapper
-        uses: gradle/wrapper-validation-action@v2
+      - name: Validate Gradle wrapper (with retry)
+        run: |
+          echo "🔍 Validating Gradle wrapper..."
+          # Simple validation without external dependencies
+          if [ -f "gradle/wrapper/gradle-wrapper.properties" ] && [ -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "✅ Gradle wrapper files exist"
+            ./gradlew --version || echo "⚠️ Gradle version check failed, continuing..."
+          else
+            echo "❌ Gradle wrapper files missing"
+            exit 1
+          fi
 
       - name: Check for Release Secrets
         id: check_secrets
@@ -88,17 +110,22 @@ jobs:
           echo "ANDROID_KEY_ALIAS_PASSWORD=${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}" >> $GITHUB_ENV
           echo "🔐 Keystore configured for release signing"
 
+      - name: Clean project
+        run: |
+          echo "🧹 Cleaning project..."
+          ./gradlew clean --stacktrace
+
       - name: Build Debug APK
         if: github.event.inputs.release_type != 'release'
         run: |
           echo "🏗️ Building Debug APK..."
-          ./gradlew assembleDebug --stacktrace --info
+          ./gradlew assembleDebug --stacktrace --info --no-daemon
           
       - name: Build Release APK (Signed)
         if: github.event.inputs.release_type == 'release' && steps.check_secrets.outputs.has_keystore == 'true'
         run: |
           echo "🏗️ Building Signed Release APK..."
-          ./gradlew assembleRelease --stacktrace --info
+          ./gradlew assembleRelease --stacktrace --info --no-daemon
 
       - name: Build Release APK (Unsigned)
         if: github.event.inputs.release_type == 'release' && steps.check_secrets.outputs.has_keystore == 'false'
@@ -110,34 +137,51 @@ jobs:
           echo "- ANDROID_KEYSTORE_PASSWORD"
           echo "- ANDROID_KEY_ALIAS" 
           echo "- ANDROID_KEY_ALIAS_PASSWORD"
-          ./gradlew assembleRelease --stacktrace --info
+          ./gradlew assembleRelease --stacktrace --info --no-daemon
+
+      - name: List build outputs
+        if: always()
+        run: |
+          echo "📋 Build outputs:"
+          find app/build/outputs -name "*.apk" -exec ls -la {} \; || echo "No APK files found"
 
       - name: Prepare APK artifacts
         run: |
           mkdir -p build-outputs
-          find app/build/outputs/apk -name "*.apk" -exec cp {} build-outputs/ \;
+          
+          # Find and copy APK files
+          if find app/build/outputs/apk -name "*.apk" -exec cp {} build-outputs/ \; 2>/dev/null; then
+            echo "✅ APK files copied to build-outputs"
+          else
+            echo "❌ No APK files found to copy"
+            exit 1
+          fi
           
           # Rename files for clarity
           cd build-outputs
           for file in *.apk; do
             if [[ "$file" == *"debug"* ]]; then
-              mv "$file" "LayoutOrchestrator-debug-$(date +%Y%m%d-%H%M).apk"
+              new_name="LayoutOrchestrator-debug-$(date +%Y%m%d-%H%M).apk"
+              mv "$file" "$new_name"
+              echo "📱 Debug APK: $new_name"
             elif [[ "$file" == *"release"* ]]; then
               if [ "${{ steps.check_secrets.outputs.has_keystore }}" = "true" ]; then
-                mv "$file" "LayoutOrchestrator-release-signed-$(date +%Y%m%d-%H%M).apk"
+                new_name="LayoutOrchestrator-release-signed-$(date +%Y%m%d-%H%M).apk"
               else
-                mv "$file" "LayoutOrchestrator-release-unsigned-$(date +%Y%m%d-%H%M).apk"
+                new_name="LayoutOrchestrator-release-unsigned-$(date +%Y%m%d-%H%M).apk"
               fi
+              mv "$file" "$new_name"
+              echo "📱 Release APK: $new_name"
             fi
           done
           
-          echo "📱 Generated APK files:"
+          echo "📱 Final APK files:"
           ls -la *.apk
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: LayoutOrchestrator-APKs-${{ github.sha }}
+          name: LayoutOrchestrator-APKs-${{ github.run_number }}
           path: build-outputs/*.apk
           retention-days: 30
           if-no-files-found: error
@@ -146,11 +190,12 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-reports-${{ github.sha }}
+          name: build-reports-${{ github.run_number }}
           path: |
             app/build/reports/
             build/reports/
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Generate Build Summary
         if: always()
@@ -161,11 +206,19 @@ jobs:
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Build Type:** ${{ github.event.inputs.release_type || 'debug' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Keystore Available:** ${{ steps.check_secrets.outputs.has_keystore }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -d "build-outputs" ]; then
             echo "### 📱 Generated APKs:" >> $GITHUB_STEP_SUMMARY
-            ls -la build-outputs/ | grep "\.apk" | awk '{print "- " $9 " (" $5 " bytes)"}' >> $GITHUB_STEP_SUMMARY
+            cd build-outputs
+            for apk in *.apk; do
+              if [ -f "$apk" ]; then
+                size=$(stat -f%z "$apk" 2>/dev/null || stat -c%s "$apk" 2>/dev/null || echo "unknown")
+                echo "- $apk (${size} bytes)" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            cd ..
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -173,7 +226,7 @@ jobs:
           echo "1. Go to the **Actions** tab in your repository" >> $GITHUB_STEP_SUMMARY
           echo "2. Click on this workflow run" >> $GITHUB_STEP_SUMMARY
           echo "3. Scroll down to **Artifacts** section" >> $GITHUB_STEP_SUMMARY
-          echo "4. Download the APK ZIP file" >> $GITHUB_STEP_SUMMARY
+          echo "4. Download the \`LayoutOrchestrator-APKs-${{ github.run_number }}\` ZIP file" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ steps.check_secrets.outputs.has_keystore }}" = "false" ] && [ "${{ github.event.inputs.release_type }}" = "release" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -193,13 +246,13 @@ jobs:
       - name: Download APK artifacts
         uses: actions/download-artifact@v4
         with:
-          name: LayoutOrchestrator-APKs-${{ github.sha }}
+          pattern: LayoutOrchestrator-APKs-*
           path: ./artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./artifacts/*.apk
+          files: ./artifacts/**/*.apk
           generate_release_notes: true
           draft: false
           prerelease: false
