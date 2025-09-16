@@ -36,7 +36,7 @@ jobs:
 
     - name: Build with Gradle
       working-directory: ./LayoutOrchestrator-final #<-- Make sure this matches the folder in your zip
-      run: ./gradlew assembleRelease
+      run: ./gradlew :app:assembleRelease
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
