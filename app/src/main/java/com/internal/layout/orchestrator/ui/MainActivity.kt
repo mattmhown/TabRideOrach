@@ -1,134 +1,217 @@
 package com.internal.layout.orchestrator.ui
 
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
-import android.widget.*
-import androidx.appcompat.app.AlertDialog
+import android.provider.Settings
+import android.widget.Button
+import android.widget.Switch
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.internal.layout.orchestrator.R
-import com.internal.layout.orchestrator.data.LayoutConfig
+import com.internal.layout.orchestrator.core.LayoutOrchestrator
 import com.internal.layout.orchestrator.data.TemplatesRepository
+import com.internal.layout.orchestrator.services.LayoutWatchdogService
+import com.internal.layout.orchestrator.services.ResetBubbleService
+import com.internal.layout.orchestrator.shell.ShizukuShell
+import kotlinx.coroutines.launch
 
-class ConfigActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity() {
+    private lateinit var orchestrator: LayoutOrchestrator
     private lateinit var repo: TemplatesRepository
-    private lateinit var pkg: PackageManager
-    private var config: LayoutConfig = LayoutConfig.getDefault()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_config)
+        setContentView(R.layout.activity_main)
 
+        orchestrator = LayoutOrchestrator(this)
         repo = TemplatesRepository(this)
-        pkg = packageManager
-        config = repo.getActive()
 
         setupUI()
-        updateUI()
+        handleIntent(intent)
+       
+        // Show initial instructions if first run
+        if (isFirstRun()) {
+            showFirstRunInstructions()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+
+    private fun isFirstRun(): Boolean {
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val firstRun = prefs.getBoolean("first_run", true)
+        if (firstRun) {
+            prefs.edit().putBoolean("first_run", false).apply()
+        }
+        return firstRun
+    }
+
+    private fun showFirstRunInstructions() {
+        Toast.makeText(this, "Welcome! Follow setup instructions below", Toast.LENGTH_LONG).show()
     }
 
     private fun setupUI() {
-        findViewById<Button>(R.id.btnSelectTopApp).setOnClickListener {
-            selectApp("Top") { app ->
-                config = config.copy(topApp = app)
-                updateUI()
-            }
+        findViewById<Button>(R.id.btnApplyLayout)?.setOnClickListener {
+            applyLayout()
         }
        
-        findViewById<Button>(R.id.btnSelectBottomLeftApp).setOnClickListener {
-            selectApp("Bottom Left") { app ->
-                config = config.copy(bottomLeftApp = app)
-                updateUI()
-            }
+        findViewById<Button>(R.id.btnConfigureApps)?.setOnClickListener {
+            startActivity(Intent(this, ConfigActivity::class.java))
         }
        
-        findViewById<Button>(R.id.btnSelectBottomRightApp).setOnClickListener {
-            selectApp("Bottom Right") { app ->
-                config = config.copy(bottomRightApp = app)
-                updateUI()
-            }
-        }
-
-        findViewById<SeekBar>(R.id.seekBarTopHeight).setOnSeekBarChangeListener(
-            object: SeekBar.OnSeekBarChangeListener{
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    if (fromUser) {
-                        config = config.copy(topHeightPercent = progress / 100f)
-                        updateUI()
-                    }
-                }
-                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-            }
-        )
-
-        findViewById<Button>(R.id.btnActiveTemplate).setOnClickListener {
-            val all = repo.list()
-            val names = all.map { it.name }.toTypedArray()
-            AlertDialog.Builder(this)
-                .setTitle("Select active template")
-                .setItems(names) { _, which ->
-                    repo.setActive(names[which])
-                    config = all[which]
-                    updateUI()
-                    Toast.makeText(this, "Active template set to: ${names[which]}", Toast.LENGTH_SHORT).show()
-                }
-                .show()
-        }
-
-        findViewById<Button>(R.id.btnSaveConfig).setOnClickListener {
-            val name = findViewById<EditText>(R.id.etTemplateName).text.toString().ifBlank { "Template" }
-            repo.upsert(config.copy(name = name))
-            repo.setActive(name)
-            Toast.makeText(this, "Saved template: $name", Toast.LENGTH_SHORT).show()
-            setResult(RESULT_OK)
-            finish()
-        }
-       
-        findViewById<Button>(R.id.btnDeleteTemplate).setOnClickListener {
-            if (config.name != "Default") {
-                AlertDialog.Builder(this)
-                    .setTitle("Delete Template")
-                    .setMessage("Delete template '${config.name}'?")
-                    .setPositiveButton("Delete") { _, _ ->
-                        repo.delete(config.name)
-                        config = LayoutConfig.getDefault()
-                        repo.setActive(config.name)
-                        updateUI()
-                        Toast.makeText(this, "Template deleted", Toast.LENGTH_SHORT).show()
-                    }
-                    .setNegativeButton("Cancel", null)
-                    .show()
+        findViewById<Switch>(R.id.switchWatchdog)?.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                LayoutWatchdogService.start(this)
+                Toast.makeText(this, "Watchdog service started", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(this, "Cannot delete default template", Toast.LENGTH_SHORT).show()
+                LayoutWatchdogService.stop(this)
+                Toast.makeText(this, "Watchdog service stopped", Toast.LENGTH_SHORT).show()
+            }
+        }
+       
+        findViewById<Button>(R.id.btnOverlayPermission)?.setOnClickListener {
+            requestOverlayPermission()
+        }
+       
+        findViewById<Button>(R.id.btnUsageAccess)?.setOnClickListener {
+            requestUsageAccess()
+        }
+       
+        findViewById<Button>(R.id.btnGrantShizuku)?.setOnClickListener {
+            handleShizukuPermission()
+        }
+       
+        findViewById<Button>(R.id.btnEnableFreeform)?.setOnClickListener {
+            enableFreeformFlags()
+        }
+       
+        findViewById<Switch>(R.id.switchBubble)?.setOnCheckedChangeListener { button, isChecked ->
+            if (isChecked && !Settings.canDrawOverlays(this)) {
+                requestOverlayPermission()
+                (button as Switch).isChecked = false
+                return@setOnCheckedChangeListener
+            }
+           
+            if (isChecked) {
+                startService(Intent(this, ResetBubbleService::class.java))
+                Toast.makeText(this, "Floating reset bubble enabled", Toast.LENGTH_SHORT).show()
+            } else {
+                stopService(Intent(this, ResetBubbleService::class.java))
+                Toast.makeText(this, "Floating reset bubble disabled", Toast.LENGTH_SHORT).show()
+            }
+        }
+       
+        updateStatusIndicators()
+    }
+
+    private fun applyLayout() {
+        if (!Settings.canDrawOverlays(this)) {
+            requestOverlayPermission()
+            return
+        }
+       
+        lifecycleScope.launch {
+            try {
+                val cfg = repo.getActive()
+                val result = orchestrator.applyLayout(cfg)
+                Toast.makeText(
+                    this@MainActivity,
+                    if (result.success) "Applied ${cfg.name}: ${result.message}" else result.message,
+                    if (result.success) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    private fun updateUI() {
-        findViewById<TextView>(R.id.tvTopApp).text = "Top: ${config.topApp.displayName}"
-        findViewById<TextView>(R.id.tvBottomLeftApp).text = "Bottom Left: ${config.bottomLeftApp.displayName}"
-        findViewById<TextView>(R.id.tvBottomRightApp).text = "Bottom Right: ${config.bottomRightApp.displayName}"
-        findViewById<TextView>(R.id.tvTopHeight).text = "Top Height: ${(config.topHeightPercent * 100).toInt()}%"
-        findViewById<SeekBar>(R.id.seekBarTopHeight).progress = (config.topHeightPercent * 100).toInt()
-        findViewById<EditText>(R.id.etTemplateName).setText(config.name)
+    private fun handleIntent(intent: Intent) {
+        when (intent.getStringExtra("action")) {
+            "reset_layout" -> applyLayout()
+        }
     }
 
-    private fun selectApp(position: String, onSelected: (LayoutConfig.AppConfig) -> Unit) {
-        val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
-        val apps = pkg.queryIntentActivities(intent, 0).map { ri ->
-            val label = pkg.getApplicationLabel(ri.activityInfo.applicationInfo).toString()
-            LayoutConfig.AppConfig(
-                packageName = ri.activityInfo.packageName,
-                activityName = ri.activityInfo.name,
-                displayName = label
-            )
-        }.sortedBy { it.displayName }
+    private fun handleShizukuPermission() {
+        if (!ShizukuShell.isBinderAlive()) {
+            Toast.makeText(
+                this,
+                "Open Shizuku app and tap Start (Wireless debugging)",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
        
-        val names = apps.map { it.displayName }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Select $position App")
-            .setItems(names) { _, which -> onSelected(apps[which]) }
-            .show()
+        if (ShizukuShell.hasPermission()) {
+            Toast.makeText(this, "Shizuku permission already granted", Toast.LENGTH_SHORT).show()
+        } else {
+            ShizukuShell.requestPermission { granted ->
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        if (granted) "Shizuku access granted!" else "Permission denied",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                   
+                    if (granted) {
+                        updateStatusIndicators()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun enableFreeformFlags() {
+        lifecycleScope.launch {
+            if (!ShizukuShell.isBinderAlive() || !ShizukuShell.hasPermission()) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Start Shizuku and grant permission first",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+           
+            try {
+                orchestrator.enableFreeformFlags()
+                Toast.makeText(this@MainActivity, "Freeform flags set successfully!", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun requestOverlayPermission() {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:$packageName")
+        )
+        startActivity(intent)
+        Toast.makeText(this, "Please grant overlay permission", Toast.LENGTH_LONG).show()
+    }
+
+    private fun requestUsageAccess() {
+        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        startActivity(intent)
+        Toast.makeText(this, "Please grant usage access (optional)", Toast.LENGTH_LONG).show()
+    }
+
+    private fun updateStatusIndicators() {
+        findViewById<TextView>(R.id.tvShizukuStatus)?.apply {
+            text = if (ShizukuShell.isBinderAlive()) {
+                if (ShizukuShell.hasPermission()) "✓ Connected & Granted" else "⚠ Connected, Not Granted"
+            } else {
+                "✗ Not Connected"
+            }
+        }
+       
+        findViewById<TextView>(R.id.tvFreeformStatus)?.apply {
+            text = "Unknown (Tap 'Enable Freeform Flags')"
+        }
     }
 }
